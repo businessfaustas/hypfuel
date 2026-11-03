@@ -254,6 +254,7 @@ td.num{font-variant-numeric:tabular-nums}
       <button class="nav-item" data-page="tasks"><span class="ico">✅</span>Daily Tasks<span class="badge" id="taskBadge"></span></button>
       <button class="nav-item" data-page="influencers"><span class="ico">🤝</span>Influencers</button>
       <button class="nav-item" data-page="sales"><span class="ico">💶</span>Sales Log</button>
+      <button class="nav-item" data-page="expenses"><span class="ico">🧾</span>Expenses</button>
       <button class="nav-item" data-page="content"><span class="ico">🎬</span>Content Ideas</button>
       <button class="nav-item" data-page="audience"><span class="ico">🎯</span>Target Audience</button>
       <button class="nav-item" data-page="brand"><span class="ico">⚡</span>Brand Info</button>
@@ -319,7 +320,7 @@ td.num{font-variant-numeric:tabular-nums}
         <div class="stat glass" style="--c:var(--green)"><div class="lbl"><i>🏆</i>Top channel</div><div class="val" id="tTop" style="font-size:20px">—</div></div>
       </div>
       <form class="card glass" id="saleForm" style="margin-bottom:16px">
-        <div class="card-title">Add sale</div>
+        <div class="card-title">Add sale <span class="saved" id="saleDraft">✓ Draft saved</span></div>
         <div class="form-grid">
           <div class="field"><label>Date</label><input class="input" type="date" id="saDate" required></div>
           <div class="field"><label>Units sold</label><input class="input" type="number" min="1" step="1" id="saUnits" required placeholder="e.g. 3"></div>
@@ -332,6 +333,31 @@ td.num{font-variant-numeric:tabular-nums}
       <div class="card glass" style="padding:8px"><div class="table-wrap"><table>
         <thead><tr><th>Date</th><th>Units</th><th>Revenue</th><th>Channel</th><th>Running total</th><th></th></tr></thead>
         <tbody id="saleBody"></tbody></table></div></div>
+    </section>
+
+    <!-- EXPENSES -->
+    <section class="page" id="page-expenses">
+      <div class="page-head"><div><h1 class="page-title">Expenses</h1><p class="page-sub">Track where the money goes. Profit = revenue − expenses.</p></div></div>
+      <div class="totals">
+        <div class="stat glass" style="--c:var(--red)"><div class="lbl"><i>🧾</i>Total expenses</div><div class="val" id="eTotal">€0</div></div>
+        <div class="stat glass" style="--c:var(--blue)"><div class="lbl"><i>📅</i>This month</div><div class="val" id="eMonth">€0</div></div>
+        <div class="stat glass" style="--c:var(--green)"><div class="lbl"><i>📈</i>Net profit</div><div class="val" id="eProfit">€0</div></div>
+        <div class="stat glass" style="--c:var(--purple)"><div class="lbl"><i>🏷️</i>Biggest category</div><div class="val" id="eTop" style="font-size:20px">—</div></div>
+      </div>
+      <form class="card glass" id="expForm" style="margin-bottom:16px">
+        <div class="card-title">Add expense <span class="saved" id="expDraft">✓ Draft saved</span></div>
+        <div class="form-grid">
+          <div class="field"><label>Date</label><input class="input" type="date" id="exDate" required></div>
+          <div class="field span2"><label>Reason</label><input class="input" id="exReason" required placeholder="e.g. Samples shipped to influencers"></div>
+          <div class="field"><label>Category</label><select class="input" id="exCat"></select></div>
+          <div class="field"><label>Amount (€)</label><input class="input" type="number" min="0" step="0.01" id="exAmt" required placeholder="e.g. 25.00"></div>
+          <button class="btn btn-primary" type="submit">+ Add expense</button>
+        </div>
+      </form>
+      <div class="filters" id="expFilters"></div>
+      <div class="card glass" style="padding:8px"><div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Reason</th><th>Category</th><th>Amount</th><th></th></tr></thead>
+        <tbody id="expBody"></tbody></table></div></div>
     </section>
 
     <!-- CONTENT -->
@@ -505,6 +531,7 @@ function go(page) {
   document.body.classList.remove('nav-open');
   window.scrollTo({top: 0});
   if (page === 'dashboard') renderDashboard();
+  if (page === 'expenses') renderExpenses();
 }
 $('#nav').addEventListener('click', e => { const b = e.target.closest('.nav-item'); if (b) go(b.dataset.page); });
 document.addEventListener('click', e => { const b = e.target.closest('[data-go]'); if (b) go(b.dataset.go); });
@@ -548,6 +575,7 @@ function renderTasks() {
       <form class="add-row" data-addf="${f}"><input class="input" placeholder="Add ${l.toLowerCase()} task…"><button class="btn btn-ghost">+</button></form>
     </div>`;
   }).join('');
+  const dr = store.get('drafts', {}); FREQS.forEach(({f}) => { const i = $(`[data-addf="${f}"] input`); if (i && dr['task_' + f]) i.value = dr['task_' + f]; });
 }
 $('#taskCols').addEventListener('click', e => {
   const del = e.target.closest('[data-del]');
@@ -556,7 +584,7 @@ $('#taskCols').addEventListener('click', e => {
 });
 $('#taskCols').addEventListener('submit', e => {
   e.preventDefault(); const f = e.target.dataset.addf, inp = $('input', e.target), v = inp.value.trim(); if (!v) return;
-  const tasks = store.get('tasks', []); tasks.push({id: uid(), t: v, f}); store.set('tasks', tasks); renderTasks(); updateBadge();
+  const tasks = store.get('tasks', []); tasks.push({id: uid(), t: v, f}); store.set('tasks', tasks); const dr = store.get('drafts', {}); delete dr['task_' + f]; store.set('drafts', dr); renderTasks(); updateBadge();
   $(`[data-addf="${f}"] input`).focus();
 });
 
@@ -598,6 +626,7 @@ function openInf(it) {
   $('#infModalTitle').textContent = it ? 'Edit influencer' : 'Add influencer';
   $('#ifName').value = it?.name || ''; $('#ifPlat').value = it?.platform || 'Instagram'; $('#ifFol').value = it?.followers || '';
   $('#ifNiche').value = it?.niche || 'Fitness'; $('#ifStatus').value = it?.status || 'todo'; $('#ifNotes').value = it?.notes || '';
+  if ((store.get('drafts', {}).infForm || {})._edit === editingInf) restoreDraft('infForm');
   openModal('infModal'); setTimeout(() => $('#ifName').focus(), 50);
 }
 $('#addInfBtn').addEventListener('click', () => openInf(null));
@@ -606,7 +635,7 @@ $('#infForm').addEventListener('submit', e => {
   const data = {name: $('#ifName').value.trim(), platform: $('#ifPlat').value, followers: $('#ifFol').value.trim(), niche: $('#ifNiche').value.trim(), status: $('#ifStatus').value, notes: $('#ifNotes').value.trim()};
   const all = store.get('influencers', []);
   if (editingInf) Object.assign(all.find(i => i.id === editingInf), data); else all.unshift({id: uid(), ...data});
-  store.set('influencers', all); closeModal('infModal'); renderInfluencers(); toast(editingInf ? 'Influencer updated' : 'Influencer added');
+  store.set('influencers', all); clearDraft('infForm'); closeModal('infModal'); renderInfluencers(); toast(editingInf ? 'Influencer updated' : 'Influencer added');
 });
 
 /* =========== SALES =========== */
@@ -628,13 +657,72 @@ $('#saleForm').addEventListener('submit', e => {
   e.preventDefault();
   const sales = store.get('sales', []);
   sales.push({id: uid(), date: $('#saDate').value, units: parseInt($('#saUnits').value, 10), revenue: parseFloat($('#saRev').value), channel: $('#saCh').value.trim(), created: Date.now()});
-  store.set('sales', sales); $('#saUnits').value = ''; $('#saRev').value = ''; renderSales(); toast('Sale logged 💶');
+  store.set('sales', sales); $('#saUnits').value = ''; $('#saRev').value = ''; clearDraft('saleForm'); renderSales(); renderExpenses(); toast('Sale logged 💶');
 });
 $('#saleBody').addEventListener('click', e => {
   if (!e.target.closest('[data-del]')) return;
   const id = e.target.closest('tr').dataset.id;
-  if (confirm('Delete this sale?')) { store.set('sales', store.get('sales', []).filter(x => x.id !== id)); renderSales(); }
+  if (confirm('Delete this sale?')) { store.set('sales', store.get('sales', []).filter(x => x.id !== id)); renderSales(); renderExpenses(); }
 });
+
+/* =========== EXPENSES =========== */
+const EXP_CATS = ['Inventory / production', 'Packaging', 'Influencer samples', 'Shipping', 'Ads', 'Content production', 'Software / subscriptions', 'Website', 'Legal / admin', 'Other'];
+let expFilter = 'all';
+$('#exCat').innerHTML = EXP_CATS.map(c => `<option>${c}</option>`).join('');
+$('#exDate').value = isoDate(new Date());
+function expTotals() {
+  const ex = store.get('expenses', []), sales = store.get('sales', []);
+  const total = ex.reduce((a, x) => a + +x.amount, 0), rev = sales.reduce((a, x) => a + +x.revenue, 0);
+  return {ex, total, rev, profit: rev - total};
+}
+function renderExpenses() {
+  const {ex, total, profit} = expTotals();
+  const month = isoDate(new Date()).slice(0, 7);
+  const by = {}; ex.forEach(x => by[x.category] = (by[x.category] || 0) + +x.amount);
+  const top = Object.entries(by).sort((a, b) => b[1] - a[1])[0];
+  $('#eTotal').textContent = eur(total);
+  $('#eMonth').textContent = eur(ex.filter(x => x.date.startsWith(month)).reduce((a, x) => a + +x.amount, 0));
+  $('#eProfit').textContent = (profit < 0 ? '−' : '') + eur(Math.abs(profit));
+  $('#eProfit').style.color = profit < 0 ? '#fca5a5' : '#86efac';
+  $('#eTop').textContent = top ? top[0] : '—';
+  const cats = EXP_CATS.filter(c => by[c] !== undefined);
+  $('#expFilters').innerHTML = ex.length ? [`<button class="chip ${expFilter === 'all' ? 'on' : ''}" data-f="all">All<span class="n">${ex.length}</span></button>`,
+    ...cats.map(c => `<button class="chip ${expFilter === c ? 'on' : ''}" data-f="${esc(c)}">${esc(c)}<span class="n">${eur(by[c])}</span></button>`)].join('') : '';
+  const list = ex.filter(x => expFilter === 'all' || x.category === expFilter).sort((a, b) => b.date.localeCompare(a.date) || b.created - a.created);
+  $('#expBody').innerHTML = list.map(x => `<tr data-id="${x.id}"><td>${new Date(x.date + 'T00:00').toLocaleDateString('en-GB', {day: 'numeric', month: 'short', year: 'numeric'})}</td><td>${esc(x.reason)}</td><td><span class="pill st-sample">${esc(x.category)}</span></td><td class="num" style="color:#fca5a5;font-weight:600">−${eur(x.amount)}</td><td style="text-align:right"><button class="btn-icon danger" data-del title="Delete">✕</button></td></tr>`).join('')
+    || `<tr><td colspan="5" class="empty">No expenses logged yet.</td></tr>`;
+}
+$('#expForm').addEventListener('submit', e => {
+  e.preventDefault();
+  const ex = store.get('expenses', []);
+  ex.push({id: uid(), date: $('#exDate').value, reason: $('#exReason').value.trim(), category: $('#exCat').value, amount: parseFloat($('#exAmt').value), created: Date.now()});
+  store.set('expenses', ex); $('#exReason').value = ''; $('#exAmt').value = ''; clearDraft('expForm'); renderExpenses(); toast('Expense logged 🧾');
+});
+$('#expFilters').addEventListener('click', e => { const c = e.target.closest('.chip'); if (c) { expFilter = c.dataset.f; renderExpenses(); } });
+$('#expBody').addEventListener('click', e => {
+  if (!e.target.closest('[data-del]')) return;
+  const id = e.target.closest('tr').dataset.id;
+  if (confirm('Delete this expense?')) { store.set('expenses', store.get('expenses', []).filter(x => x.id !== id)); renderExpenses(); }
+});
+
+/* =========== DRAFT AUTOSAVE =========== */
+// Every form field is saved as you type, so a half-filled sale/expense/idea survives a refresh or closing the tab.
+const DRAFT_FORMS = {saleForm: 'saleDraft', expForm: 'expDraft', infForm: null, ideaForm: null};
+function saveDraft(formId) {
+  const d = {}; $$('input,select,textarea', $('#' + formId)).forEach(el => { if (el.id) d[el.id] = el.value; });
+  d._edit = formId === 'infForm' ? editingInf : formId === 'ideaForm' ? editingIdea : null;
+  const drafts = store.get('drafts', {}); drafts[formId] = d; store.set('drafts', drafts);
+  const ind = DRAFT_FORMS[formId]; if (ind) flashSaved($('#' + ind));
+}
+function clearDraft(formId) { const drafts = store.get('drafts', {}); delete drafts[formId]; store.set('drafts', drafts); }
+function restoreDraft(formId) {
+  const d = store.get('drafts', {})[formId]; if (!d) return false;
+  Object.entries(d).forEach(([id, v]) => { const el = $('#' + id); if (el) el.value = v; });
+  return true;
+}
+Object.keys(DRAFT_FORMS).forEach(id => { const f = $('#' + id); f.addEventListener('input', () => saveDraft(id)); f.addEventListener('change', () => saveDraft(id)); });
+// task "add" inputs
+$('#taskCols').addEventListener('input', e => { const f = e.target.closest('[data-addf]'); if (!f) return; const t = store.get('drafts', {}); t['task_' + f.dataset.addf] = e.target.value; store.set('drafts', t); });
 
 /* =========== CONTENT =========== */
 let fPlat = 'all', fType = 'all', fStage = 'all', editingIdea = null;
@@ -682,6 +770,7 @@ function openIdea(it) {
   $('#ideaModalTitle').textContent = it ? 'Edit idea' : 'New content idea';
   $('#idTitle').value = it?.title || ''; $('#idPlat').value = it?.platform || PLATFORMS[0]; $('#idType').value = it?.type || TYPES[0];
   $('#idStatus').value = it?.status || 'idea'; $('#idScript').value = it?.script || '';
+  if ((store.get('drafts', {}).ideaForm || {})._edit === editingIdea) restoreDraft('ideaForm');
   openModal('ideaModal'); setTimeout(() => $('#idTitle').focus(), 50);
 }
 $('#addIdeaBtn').addEventListener('click', () => openIdea(null));
@@ -690,7 +779,7 @@ $('#ideaForm').addEventListener('submit', e => {
   const data = {title: $('#idTitle').value.trim(), platform: $('#idPlat').value, type: $('#idType').value, status: $('#idStatus').value, script: $('#idScript').value.trim()};
   const all = store.get('ideas', []);
   if (editingIdea) Object.assign(all.find(i => i.id === editingIdea), data); else all.push({id: uid(), created: Date.now(), ...data});
-  store.set('ideas', all); closeModal('ideaModal'); renderIdeas(); toast(editingIdea ? 'Idea updated' : 'Idea added 💡');
+  store.set('ideas', all); clearDraft('ideaForm'); closeModal('ideaModal'); renderIdeas(); toast(editingIdea ? 'Idea updated' : 'Idea added 💡');
 });
 
 /* =========== AUDIENCE =========== */
@@ -744,7 +833,9 @@ function renderDashboard() {
   const units = sales.reduce((a, x) => a + +x.units, 0), rev = sales.reduce((a, x) => a + +x.revenue, 0);
   const today = isoDate(now), todays = sales.filter(x => x.date === today);
   $('#sUnits').textContent = fmtInt(units); $('#sUnitsF').textContent = `+${fmtInt(todays.reduce((a, x) => a + +x.units, 0))} today`;
-  $('#sRev').textContent = eur(rev); $('#sRevF').textContent = `+${eur(todays.reduce((a, x) => a + +x.revenue, 0))} today`;
+  $('#sRev').textContent = eur(rev);
+  const {total: expT, profit} = expTotals();
+  $('#sRevF').textContent = `+${eur(todays.reduce((a, x) => a + +x.revenue, 0))} today · profit ${profit < 0 ? '−' : ''}${eur(Math.abs(profit))}`;
   const contacted = infs.filter(i => i.status !== 'todo').length;
   $('#sInf').textContent = contacted; $('#sInfF').textContent = `of ${infs.length} on the list · ${infs.filter(i => i.status === 'posted').length} posted`;
   const ts = todayStats(); $('#sTasks').textContent = `${ts.done}/${ts.total}`; $('#sTasksBar').style.width = (ts.total ? ts.done / ts.total * 100 : 0) + '%';
@@ -770,7 +861,8 @@ function renderDashboard() {
 }
 
 function renderAll() {
-  renderTasks(); updateBadge(); renderInfluencers(); renderSales(); renderIdeas(); renderPersonas(); renderBrand();
+  renderTasks(); updateBadge(); renderInfluencers(); renderSales(); renderExpenses(); renderIdeas(); renderPersonas(); renderBrand();
+  restoreDraft('saleForm'); restoreDraft('expForm');
   $('#audNotes').value = store.get('audience_notes', ''); $('#notesArea').value = store.get('notes', '');
   renderDashboard();
 }
